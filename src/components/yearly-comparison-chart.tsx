@@ -17,7 +17,7 @@ export default function YearlyComparisonChart({ data }: YearlyComparisonChartPro
     <Card className="w-full mt-4">
       <CardHeader>
         <CardTitle>Yearly Net Cost Comparison: Buying vs Renting</CardTitle>
-        <CardDescription>Chart showing the net costs of buying and renting over 10 years</CardDescription>
+        <CardDescription>Chart showing the net costs of buying and renting over {data.length} years</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer
@@ -45,6 +45,14 @@ export default function YearlyComparisonChart({ data }: YearlyComparisonChartPro
             </LineChart>
           </ResponsiveContainer>
         </ChartContainer>
+        <div>
+          <p className="text-xs text-gray-500">
+            * Buying net cost includes mortgage, taxes, insurance, HOA, and selling costs, offset by home appreciation
+          </p>
+          <p className="text-xs text-gray-500">
+            * Renting net cost factors in total rent minus potential investment returns from down payment
+          </p>
+        </div>
       </CardContent>
     </Card>
   )

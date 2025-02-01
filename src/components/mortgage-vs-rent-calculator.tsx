@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -32,6 +32,7 @@ export default function MortgageVsRentCalculator() {
     monthlyRent: 5000,
     annualRentIncreaseRate: 10,
     annualInvestmentReturnRate: 7,
+    oneTimeSellingFeeRate: 5,
   });
 
   const [results, setResults] = useState<
@@ -43,10 +44,10 @@ export default function MortgageVsRentCalculator() {
     setInputs((prev) => ({ ...prev, [name]: Number.parseFloat(value) || 0 }));
   };
 
-  const handleCalculate = () => {
+  useEffect(() => {
     const calculatedResults = calculateMortgageVsRent(inputs);
     setResults(calculatedResults);
-  };
+  }, [inputs])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -144,6 +145,19 @@ export default function MortgageVsRentCalculator() {
                 onChange={handleInputChange}
               />
             </div>
+            <div>
+              <Label htmlFor="oneTimeSellingFeeRate">
+                One Time Selling Fee Rate (%)
+              </Label>
+              <Input
+                id="oneTimeSellingFeeRate"
+                name="oneTimeSellingFeeRate"
+                type="number"
+                step="0.1"
+                value={inputs.oneTimeSellingFeeRate}
+                onChange={handleInputChange}
+              />
+            </div>
             <hr className="md:col-span-2 mt-2" />
             <div>
               <Label htmlFor="monthlyRent">Monthly Rent ($)</Label>
@@ -182,9 +196,6 @@ export default function MortgageVsRentCalculator() {
               />
             </div>
           </div>
-          <Button className="mt-4 w-full" onClick={handleCalculate}>
-            Calculate
-          </Button>
         </CardContent>
       </Card>
       <div>

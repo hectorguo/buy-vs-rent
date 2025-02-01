@@ -5,6 +5,7 @@ export interface Inputs {
   loanTerm: number
   hoa: number
   insurance: number
+  oneTimeSellingFeeRate: number
   propertyTaxRate: number
   annualAppreciationRate: number
   monthlyRent: number
@@ -12,178 +13,151 @@ export interface Inputs {
   annualInvestmentReturnRate: number
 }
 
-export interface Results {
-  fiveYear: {
-    buyCost: number
-    rentCost: number
-    investmentReturns: number
-    homeValue: number
-    equity: number
-    netCostBuy: number
-    netCostRent: number
-  }
-  tenYear: {
-    buyCost: number
-    rentCost: number
-    investmentReturns: number
-    homeValue: number
-    equity: number
-    netCostBuy: number
-    netCostRent: number
-  }
+interface CostAnalysis {
+  buyCost: number
+  rentCost: number
+  investmentReturns: number
+  homeValue: number
+  equity: number
+  netCostBuy: number
+  netCostRent: number
 }
 
 export interface YearlyComparison {
   year: number
   buyCost: number
   rentCost: number
+  investmentReturns: number
   buyNetCost: number
   rentNetCost: number
+  homeValue: number
   equity: number
 }
 
-export function calculateMortgageVsRent(inputs: Inputs): Results & { yearlyComparison: YearlyComparison[] } {
-  const {
-    homePrice,
-    downPayment,
-    mortgageRate,
-    loanTerm,
-    hoa,
-    insurance,
-    propertyTaxRate,
-    annualAppreciationRate,
-    monthlyRent,
-    annualRentIncreaseRate,
-    annualInvestmentReturnRate,
-  } = inputs
+export interface Results {
+  fiveYear: CostAnalysis
+  tenYear: CostAnalysis
+  yearlyComparison: YearlyComparison[]
+}
 
-  const loanAmount = homePrice - downPayment
-  const monthlyMortgageRate = mortgageRate / 100 / 12
-  const numberOfPayments = loanTerm * 12
+// Helper class to manage financial calculations
+class FinancialCalculator {
+  private monthlyMortgage: number
+  private monthlyPropertyTax: number
+  private monthlyInsurance: number
+  private loanAmount: number
 
-  // Calculate monthly mortgage payment
-  const monthlyMortgage =
-    (loanAmount * monthlyMortgageRate * Math.pow(1 + monthlyMortgageRate, numberOfPayments)) /
-    (Math.pow(1 + monthlyMortgageRate, numberOfPayments) - 1)
+  constructor(private inputs: Inputs) {
+    this.loanAmount = inputs.homePrice - inputs.downPayment
+    const monthlyRate = inputs.mortgageRate / 100 / 12
+    const numberOfPayments = inputs.loanTerm * 12
 
-  const monthlyPropertyTax = (homePrice * (propertyTaxRate / 100)) / 12
-  const monthlyInsurance = insurance / 12
+    this.monthlyMortgage = this.calculateMonthlyMortgage(monthlyRate, numberOfPayments)
+    this.monthlyPropertyTax = (inputs.homePrice * (inputs.propertyTaxRate / 100)) / 12
+    this.monthlyInsurance = inputs.insurance / 12
+  }
 
-  function calculateForPeriod(years: number) {
-    let totalBuyCost = 0
-    let totalRentCost = 0
-    let currentRent = monthlyRent
-    let currentHomeValue = homePrice
-    let remainingLoanBalance = loanAmount
+  private calculateMonthlyMortgage(monthlyRate: number, numberOfPayments: number): number {
+    return (
+      (this.loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
+      (Math.pow(1 + monthlyRate, numberOfPayments) - 1)
+    )
+  }
 
-    for (let month = 1; month <= years * 12; month++) {
-      // Buy costs
-      const interestPayment = remainingLoanBalance * monthlyMortgageRate
-      const principalPayment = monthlyMortgage - interestPayment
-      remainingLoanBalance -= principalPayment
+  private calculateMonthlyBuyCost(): number {
+    return this.monthlyMortgage + this.inputs.hoa + this.monthlyPropertyTax + this.monthlyInsurance
+  }
 
-      totalBuyCost += monthlyMortgage + hoa + monthlyPropertyTax + monthlyInsurance
+  private applyAnnualRate(value: number, rate: number): number {
+    return value * (1 + rate / 100)
+  }
 
-      // Rent costs
-      totalRentCost += currentRent
-
-      // Update values annually
-      if (month % 12 === 0) {
-        currentRent *= 1 + annualRentIncreaseRate / 100
-        currentHomeValue *= 1 + annualAppreciationRate / 100
-      }
-    }
-
-    const investmentReturns = downPayment * Math.pow(1 + annualInvestmentReturnRate / 100, years)
-    const equity = currentHomeValue - remainingLoanBalance
-    const sellingFees = currentHomeValue * 0.05
+  private calculateNetCosts(params: {
+    totalBuyCost: number
+    totalRentCost: number
+    currentHomeValue: number
+    investmentValue: number
+  }): { buyNetCost: number; rentNetCost: number } {
+    const { totalBuyCost, totalRentCost, currentHomeValue, investmentValue } = params
+    const sellingFees = currentHomeValue * (this.inputs.oneTimeSellingFeeRate / 100)
 
     return {
-      buyCost: totalBuyCost,
-      rentCost: totalRentCost,
-      investmentReturns,
-      homeValue: currentHomeValue,
-      equity,
-      netCostBuy: totalBuyCost - (currentHomeValue - homePrice) + sellingFees,
-      netCostRent: totalRentCost - (investmentReturns - downPayment),
+      buyNetCost: totalBuyCost - (currentHomeValue - this.inputs.homePrice) + sellingFees,
+      rentNetCost: totalRentCost - (investmentValue - this.inputs.downPayment),
     }
   }
 
-  function calculateYearlyComparison(inputs: Inputs): YearlyComparison[] {
-    const {
-      homePrice,
-      downPayment,
-      mortgageRate,
-      loanTerm,
-      hoa,
-      insurance,
-      propertyTaxRate,
-      annualAppreciationRate,
-      monthlyRent,
-      annualRentIncreaseRate,
-      annualInvestmentReturnRate,
-    } = inputs
-
-    const loanAmount = homePrice - downPayment
-    const monthlyMortgageRate = mortgageRate / 100 / 12
-    const numberOfPayments = loanTerm * 12
-
-    const monthlyMortgage =
-      (loanAmount * monthlyMortgageRate * Math.pow(1 + monthlyMortgageRate, numberOfPayments)) /
-      (Math.pow(1 + monthlyMortgageRate, numberOfPayments) - 1)
-
-    const monthlyPropertyTax = (homePrice * (propertyTaxRate / 100)) / 12
-    const monthlyInsurance = insurance / 12
-
-    let currentRent = monthlyRent
-    let currentHomeValue = homePrice
-    let remainingLoanBalance = loanAmount
+  calculateYearlyMetrics(years: number = 20): YearlyComparison[] {
+    let currentRent = this.inputs.monthlyRent
+    let currentHomeValue = this.inputs.homePrice
+    let remainingLoanBalance = this.loanAmount
     let totalBuyCost = 0
     let totalRentCost = 0
-    let investmentValue = downPayment
+    let investmentValue = this.inputs.downPayment
+    const yearlyMetrics: YearlyComparison[] = []
 
-    const yearlyComparison: YearlyComparison[] = []
-
-    for (let year = 1; year <= 20; year++) {
+    for (let year = 1; year <= years; year++) {
+      // Calculate monthly costs for the year
       for (let month = 1; month <= 12; month++) {
-        // Buy costs
-        const interestPayment = remainingLoanBalance * monthlyMortgageRate
-        const principalPayment = monthlyMortgage - interestPayment
+        const interestPayment = remainingLoanBalance * (this.inputs.mortgageRate / 100 / 12)
+        const principalPayment = this.monthlyMortgage - interestPayment
         remainingLoanBalance -= principalPayment
 
-        totalBuyCost += monthlyMortgage + hoa + monthlyPropertyTax + monthlyInsurance
-
-        // Rent costs
+        totalBuyCost += this.calculateMonthlyBuyCost()
         totalRentCost += currentRent
       }
 
-      // Update values annually
-      currentRent *= 1 + annualRentIncreaseRate / 100
-      currentHomeValue *= 1 + annualAppreciationRate / 100
-      investmentValue *= 1 + annualInvestmentReturnRate / 100
+      // Update annual values
+      currentRent = this.applyAnnualRate(currentRent, this.inputs.annualRentIncreaseRate)
+      currentHomeValue = this.applyAnnualRate(currentHomeValue, this.inputs.annualAppreciationRate)
+      investmentValue = this.applyAnnualRate(investmentValue, this.inputs.annualInvestmentReturnRate)
 
       const equity = currentHomeValue - remainingLoanBalance
-      const sellingFees = currentHomeValue * 0.05
-      const buyNetCost = totalBuyCost - (currentHomeValue - homePrice) + sellingFees
-      const rentNetCost = totalRentCost - (investmentValue - downPayment)
+      const { buyNetCost, rentNetCost } = this.calculateNetCosts({
+        totalBuyCost,
+        totalRentCost,
+        currentHomeValue,
+        investmentValue,
+      })
 
-      yearlyComparison.push({
+      yearlyMetrics.push({
         year,
         buyCost: totalBuyCost,
         rentCost: totalRentCost,
         buyNetCost,
         rentNetCost,
-        equity
+        homeValue: currentHomeValue,
+        equity,
+        investmentReturns: investmentValue,
       })
     }
 
-    return yearlyComparison
+    return yearlyMetrics
   }
 
-  return {
-    fiveYear: calculateForPeriod(5),
-    tenYear: calculateForPeriod(10),
-    yearlyComparison: calculateYearlyComparison(inputs),
+  // Get analysis for a specific year from yearly metrics
+  getAnalysisForYear(year: number): CostAnalysis {
+    const yearlyMetric = this.calculateYearlyMetrics(year)[year - 1]
+    
+    return {
+      buyCost: yearlyMetric.buyCost,
+      rentCost: yearlyMetric.rentCost,
+      investmentReturns: yearlyMetric.investmentReturns,
+      homeValue: yearlyMetric.homeValue,
+      equity: yearlyMetric.equity,
+      netCostBuy: yearlyMetric.buyNetCost,
+      netCostRent: yearlyMetric.rentNetCost,
+    }
   }
 }
 
+// Main calculation function
+export function calculateMortgageVsRent(inputs: Inputs): Results {
+  const calculator = new FinancialCalculator(inputs)
+  
+  return {
+    fiveYear: calculator.getAnalysisForYear(5),
+    tenYear: calculator.getAnalysisForYear(10),
+    yearlyComparison: calculator.calculateYearlyMetrics(),
+  }
+}
